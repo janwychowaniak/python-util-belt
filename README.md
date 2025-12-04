@@ -83,6 +83,43 @@ ncvz_auto('api.service.com', 443)
 
 ---
 
+### `catch_signals` - Signal Handler Protection
+
+Defer signal termination (SIGINT/SIGTERM) for critical code sections.
+
+**Features:**
+- Deferred signal handling for critical operations
+- Support for SIGINT (Ctrl+C) and SIGTERM signals
+- Proper exit codes (130 for SIGINT, 143 for SIGTERM)
+- Configurable logging (stdlib, loguru, or custom)
+- Lazy initialization (no import-time side effects)
+- Zero external dependencies
+
+**Usage:**
+```python
+from utils.catch_signals import assist_signals
+
+# Protect critical operation
+with assist_signals():
+    critical_database_commit()
+    cleanup_temporary_files()
+
+# With custom logger
+from loguru import logger
+with assist_signals(logger=logger):
+    long_running_backup()
+
+# Multiple protected sections
+while running:
+    with assist_signals():
+        process_batch()  # Each batch independently protected
+```
+
+**Version:** 1.0
+**Author:** Jan 🪄
+
+---
+
 *More utilities coming soon...*
 
 ## Development Workflow

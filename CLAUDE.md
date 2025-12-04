@@ -32,9 +32,11 @@ python-util-belt/
 ├── README.md              # User-facing documentation and catalog
 ├── CLAUDE.md              # This file
 ├── modules/               # Self-contained utility modules
-│   └── ncvz.py            # Network connectivity checker
+│   ├── ncvz.py            # Network connectivity checker
+│   └── catch_signals.py   # Signal handler protection
 ├── dev-notes/             # Manual testing notepads (development aids)
-│   └── ncvz.md            # Test scenarios and manual testing notes
+│   ├── ncvz.md            # Network connectivity test scenarios
+│   └── catch_signals.md   # Signal handling test scenarios
 └── scripts/               # Simple helper tools
     ├── copy_module.sh     # Bash script to copy modules to projects
     └── list_modules.py    # Python script to list available modules
@@ -58,7 +60,7 @@ python-util-belt/
 - Manual testing notepads used during development
 - Documents test scenarios and expected behaviors
 - Not automated test suites
-- Example: `dev-notes/ncvz.md` has manual test cases and proxy configurations
+- Examples: `dev-notes/ncvz.md` has manual test cases and proxy configurations, `dev-notes/catch_signals.md` has signal handling test scenarios
 
 **4. Minimal scripts** (bash + simple Python)
 - `copy_module.sh`: ~40 lines, copies module and shows usage
@@ -162,6 +164,28 @@ Network connectivity checker - Python equivalent of `nc -vz HOST PORT`
 - `ncvz_auto(host, port, timeout=3.0, logger=None) -> bool`
 - `ncvz_external(host, port, timeout=3.0, logger=None) -> bool`
 
+### catch_signals.py (v1.0)
+Signal handler protection - Defer signal termination for critical code sections
+
+**Location:** `modules/catch_signals.py`
+**Dev Notes:** `dev-notes/catch_signals.md`
+**Features:**
+- Deferred signal handling for critical operations
+- Support for SIGINT (Ctrl+C) and SIGTERM signals
+- Proper exit codes (130 for SIGINT, 143 for SIGTERM)
+- Configurable logging (stdlib, loguru, or custom)
+- Lazy initialization (no import-time side effects)
+- Zero external dependencies
+
+**Functions:**
+- `assist_signals(logger=None) -> ContextManager`
+
+**Key Implementation Details:**
+- Uses lazy initialization to avoid import-time side effects
+- Encapsulated state in private `_SignalState` class
+- Follows Unix exit code convention: 128 + signal_number
+- Simple boolean flag for nesting (not depth-counted)
+
 ## Development Commands
 
 ### List available modules
@@ -173,8 +197,9 @@ Network connectivity checker - Python equivalent of `nc -vz HOST PORT`
 ```bash
 ./scripts/copy_module.sh MODULE_NAME TARGET_DIR
 
-# Example
+# Examples
 ./scripts/copy_module.sh ncvz ~/my-project/utils/
+./scripts/copy_module.sh catch_signals ~/my-project/utils/
 ```
 
 ### Test module functionality
@@ -184,6 +209,11 @@ python3
 >>> from modules.ncvz import ncvz
 >>> ncvz('google.com', 80)
 True
+
+>>> from modules.catch_signals import assist_signals
+>>> with assist_signals():
+...     print("Protected")
+Protected
 ```
 
 ### Add new module
@@ -256,6 +286,7 @@ A: Modules are cross-platform (Python stdlib). Scripts work on WSL/Git Bash. Use
 3. **Simplification** - Eliminated overengineering, kept minimal viable structure
 4. **First module** - `ncvz.py` network connectivity checker
 5. **Documentation** - This CLAUDE.md and comprehensive README.md
+6. **Second module** - `catch_signals.py` signal handler protection with lazy initialization and proper exit codes
 
 ## Future Considerations
 
