@@ -7,11 +7,13 @@ A curated collection of tiny, well-documented Python helpers that stitch togethe
 This is **NOT** a traditional Python package. It's a personal "utility belt" - a collection of self-contained, single-file utilities designed to be copied directly into your projects.
 
 **Core Principles:**
-- **Zero external dependencies** - modules use only Python stdlib
+- **Minimal dependencies** - modules use only Python stdlib (with rare pragmatic exceptions*)
 - **Self-contained** - each utility is a complete, single `.py` file
 - **Copy-paste friendly** - no package management overhead
 - **Corporate-friendly** - no network dependencies in target projects
 - **Single source of truth** - this repo via git history
+
+*Note: `rmq.py` requires the `pika` library for RabbitMQ connectivity - a pragmatic exception where implementing AMQP from scratch would be impractical.
 
 ## Quick Start
 
@@ -120,6 +122,47 @@ while running:
 
 ---
 
+### `rmq` - RabbitMQ JSON Messaging
+
+Simple producer/consumer for JSON message passing via RabbitMQ.
+
+**External Dependency:** Requires `pika` library - install with: `pip install pika`
+
+**Features:**
+- JSON-only payloads (send dict, receive dict)
+- One-shot send function for infrequent messages
+- Persistent connection class for high-frequency sending
+- Blocking consumer with manual acknowledgment and automatic retry
+- Flexible authentication (explicit username/password or guest default)
+- Configurable logging (stdlib, loguru, or custom)
+
+**Usage:**
+```python
+from utils.rmq import send_json, RMQProducer, consume_json
+
+# One-shot send (simple)
+send_json({'task': 'process', 'id': 123}, 'work_queue')
+
+# Persistent producer (efficient for multiple sends)
+with RMQProducer('tasks', host='localhost') as producer:
+    producer.send({'task': 'first'})
+    producer.send({'task': 'second'})
+
+# Consumer (blocks forever)
+def process(data: dict):
+    print(f"Task: {data['task']}")
+
+consume_json('work_queue', process)
+
+# With authentication
+send_json(data, 'queue', username='admin', password='secret')
+```
+
+**Version:** 1.0
+**Author:** Jan 🪄
+
+---
+
 *More utilities coming soon...*
 
 ## Development Workflow
@@ -153,7 +196,8 @@ while running:
 
 Each utility module should:
 - Be completely self-contained in a single `.py` file
-- Use ONLY Python standard library (no external deps)
+- Prefer Python standard library (external deps allowed if pragmatic and well-justified)
+- If using external dependencies, prominently document in module docstring
 - Have a comprehensive module-level docstring including:
   - Clear description and key features
   - Basic and advanced usage examples

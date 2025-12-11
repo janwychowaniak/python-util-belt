@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **python-util-belt** is a curated collection of tiny, well-documented, self-contained Python utilities designed to be easily copied into any project. This is NOT a traditional package/library - it's a personal "utility belt" without package management overhead.
 
 **Core Principles:**
-- **Zero external dependencies** - modules use only stdlib
+- **Minimal dependencies** - modules prefer stdlib (pragmatic exceptions documented)
 - **Self-contained** - each utility is a single .py file with complete functionality
 - **Copy-paste friendly** - utilities are designed to be copied directly into projects
 - **Lean automation** - simple bash/Python scripts for convenience, not complexity
@@ -33,10 +33,12 @@ python-util-belt/
 ├── CLAUDE.md              # This file
 ├── modules/               # Self-contained utility modules
 │   ├── ncvz.py            # Network connectivity checker
-│   └── catch_signals.py   # Signal handler protection
+│   ├── catch_signals.py   # Signal handler protection
+│   └── rmq.py             # RabbitMQ JSON messaging (requires pika)
 ├── dev-notes/             # Manual testing notepads (development aids)
 │   ├── ncvz.md            # Network connectivity test scenarios
-│   └── catch_signals.md   # Signal handling test scenarios
+│   ├── catch_signals.md   # Signal handling test scenarios
+│   └── rmq.md             # RabbitMQ messaging test scenarios
 └── scripts/               # Simple helper tools
     ├── copy_module.sh     # Bash script to copy modules to projects
     └── list_modules.py    # Python script to list available modules
@@ -90,8 +92,9 @@ from utils.ncvz import ncvz
 1. **Create module** in `modules/your_utility.py`
    - Single file, self-contained
    - Comprehensive docstring (see template below)
-   - Only stdlib dependencies
+   - Prefer stdlib dependencies (external deps allowed if pragmatic)
    - Must include `Version:` and `Author:` in docstring
+   - If using external deps, prominently document in "External Dependency" section
 
 2. **Create dev notes** in `dev-notes/your_utility.md`
    - Manual test scenarios
@@ -186,6 +189,36 @@ Signal handler protection - Defer signal termination for critical code sections
 - Follows Unix exit code convention: 128 + signal_number
 - Simple boolean flag for nesting (not depth-counted)
 
+### rmq.py (v1.0)
+RabbitMQ JSON messaging - Simple producer/consumer for JSON payloads
+
+**Location:** `modules/rmq.py`
+**Dev Notes:** `dev-notes/rmq.md`
+**External Dependency:** Requires `pika` library (install: `pip install pika`)
+**Features:**
+- JSON-only payloads (send dict, receive dict)
+- One-shot send function for infrequent messages
+- Persistent connection class for high-frequency sending
+- Blocking consumer with manual acknowledgment and automatic retry
+- Flexible authentication (explicit username/password or guest default)
+- Configurable logging (stdlib, loguru, or custom)
+- Automatic queue declaration
+- Connection health checking
+
+**Functions:**
+- `send_json(data, queue, host='localhost', **kwargs) -> bool`
+- `RMQProducer(queue, host='localhost', **kwargs)` - Context manager class
+- `consume_json(queue, callback, **kwargs)` - Blocking consumer
+
+**Key Implementation Details:**
+- First module with external dependency (pragmatic exception)
+- Lazy connection in RMQProducer (connects on first send or explicit connect())
+- JSON serialization with >1MB payload warnings
+- Heartbeat defaults: 0 (one-shot), 600s (producer), 1200s (consumer)
+- Manual acknowledgment: ack after success, nack+requeue on failure (automatic retry)
+- Malformed JSON rejected without requeue (prevents infinite loops)
+- No auto-reconnect (caller should retry on False return)
+
 ## Development Commands
 
 ### List available modules
@@ -200,6 +233,7 @@ Signal handler protection - Defer signal termination for critical code sections
 # Examples
 ./scripts/copy_module.sh ncvz ~/my-project/utils/
 ./scripts/copy_module.sh catch_signals ~/my-project/utils/
+./scripts/copy_module.sh rmq ~/my-project/utils/  # Don't forget: pip install pika
 ```
 
 ### Test module functionality
@@ -214,6 +248,10 @@ True
 >>> with assist_signals():
 ...     print("Protected")
 Protected
+
+>>> from modules.rmq import send_json  # Requires: pip install pika
+>>> send_json({'task': 'test'}, 'queue')
+True
 ```
 
 ### Add new module
@@ -238,7 +276,7 @@ git commit -m "Add new_utility module"
 ## Guidelines
 
 ### Module Quality Standards
-- **Self-contained**: Single file, no external dependencies
+- **Self-contained**: Single file, minimal dependencies
 - **Well-documented**: Comprehensive docstring with examples
 - **Feature-rich**: Solve real problems, not toy examples
 - **Tested**: Manual testing documented in dev-notes/
@@ -246,7 +284,7 @@ git commit -m "Add new_utility module"
 - **Error handling**: Graceful failure with clear error messages
 
 ### What NOT to Do
-- Don't add external dependencies (use stdlib only)
+- Don't add external dependencies unless pragmatically justified and well-documented
 - Don't create complex install scripts
 - Don't add YAML/JSON metadata files
 - Don't write automated tests in this repo (belongs in target projects)
@@ -287,6 +325,39 @@ A: Modules are cross-platform (Python stdlib). Scripts work on WSL/Git Bash. Use
 4. **First module** - `ncvz.py` network connectivity checker
 5. **Documentation** - This CLAUDE.md and comprehensive README.md
 6. **Second module** - `catch_signals.py` signal handler protection with lazy initialization and proper exit codes
+7. **Third module** - `rmq.py` RabbitMQ JSON messaging - first module with external dependency (pika)
+
+## External Dependencies
+
+### Philosophy Shift: Pragmatic Dependencies
+
+The project originally targeted **zero external dependencies** (stdlib only). However, the `rmq.py` module introduces a pragmatic exception:
+
+- **rmq.py requires `pika`** - RabbitMQ client library
+- **Rationale**: Implementing AMQP 0-9-1 protocol from scratch with stdlib is impractical
+- **Documented prominently** in module docstring, dev-notes, and README
+
+### Dependency Management Strategy
+
+**No requirements.txt in repo root** - Keep belt lean
+
+**Per-module approach**:
+- Module docstring clearly states: "External Dependency: Requires 'pika' library: pip install pika"
+- dev-notes file documents installation command
+- README catalog marks modules with external dependencies
+- Users install dependencies when copying module to their project
+
+**Client responsibility**:
+- User copies `modules/rmq.py` to their project
+- User runs: `pip install pika` (or adds to their requirements.txt)
+- Module raises clear ImportError with installation instructions if pika missing
+
+**Future modules with dependencies**:
+- Document dependency in module docstring (prominent "External Dependency" section)
+- Add installation command to dev-notes
+- Mark in README catalog
+- Keep dependencies minimal and well-justified
+- Prefer stdlib when practical
 
 ## Future Considerations
 
@@ -298,7 +369,7 @@ A: Modules are cross-platform (Python stdlib). Scripts work on WSL/Git Bash. Use
 
 **Do NOT add unless absolutely necessary:**
 - Package management (pip, poetry, etc.)
-- External dependencies
+- External dependencies (unless pragmatically justified like rmq.py)
 - Complex build systems
 - Automated testing framework
 - CI/CD beyond basic linting
@@ -307,7 +378,7 @@ A: Modules are cross-platform (Python stdlib). Scripts work on WSL/Git Bash. Use
 
 When others contribute:
 1. Ensure module follows all guidelines above
-2. Verify zero external dependencies
+2. Verify minimal dependencies (prefer stdlib, document any external deps prominently)
 3. Check docstring completeness
 4. Request dev-notes with manual test scenarios
 5. Update README with new utility info

@@ -190,7 +190,7 @@ Processing: {'task': 'work_2'}
 ```
 
 **Stop:** Press Ctrl+C
-**Expected:** Consumer logs "Consumer stopped by user" and exits gracefully <<XXX
+**Expected:** Consumer logs "Consumer stopped by user" (WARNING level) and exits gracefully
 
 ---
 

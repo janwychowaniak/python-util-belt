@@ -9,7 +9,7 @@ Key Features:
     - JSON-only payloads (send dict, receive dict)
     - One-shot send function for infrequent messages
     - Persistent connection class for high-frequency sending
-    - Simple blocking consumer and advanced consumer interfaces
+    - Blocking consumer with manual acknowledgment and retry
     - Flexible authentication (explicit username/password or guest default)
     - Configurable logging (stdlib, loguru, or custom)
     - Automatic queue declaration
@@ -80,6 +80,7 @@ Functions:
 
 Notes:
     - All functions use dict-to-dict JSON messaging (no raw bytes)
+    - Consumer uses manual acknowledgment (ack after success, nack+requeue on failure)
     - Payloads over 1MB trigger warnings
     - Connections use heartbeat (default 600s producers, 1200s consumers)
     - Auto-reconnect NOT implemented (caller should retry on False)
@@ -488,6 +489,7 @@ def consume_json(
     callback: Callable[[dict], None],
     host: str = "localhost",
     port: int = 5672,
+    virtual_host: str = "/",
     username: Optional[str] = None,
     password: Optional[str] = None,
     heartbeat: int = 1200,
@@ -504,6 +506,7 @@ def consume_json(
         callback: Function(data: dict) to process messages
         host: RabbitMQ broker hostname
         port: RabbitMQ broker port
+        virtual_host: Virtual host name
         username: Authentication username
         password: Authentication password
         heartbeat: Heartbeat interval in seconds
@@ -530,14 +533,14 @@ def consume_json(
         logger = logging.getLogger(__name__)
 
     params = _get_connection_params(
-        host, port, "/", username, password, heartbeat, logger
+        host, port, virtual_host, username, password, heartbeat, logger
     )
 
     connection = pika.BlockingConnection(params)
     channel = connection.channel()
     channel.queue_declare(queue=queue)
 
-    # Wrapper to deserialize JSON, call callback, then ack
+    # Wrapper to deserialize JSON, call callback, then ack (or nack+requeue, if callback fails)
     def _internal_callback(ch, method, properties, body):
         data = _deserialize_json(body, logger)
         if data is None:
@@ -569,5 +572,5 @@ def consume_json(
     try:
         channel.start_consuming()
     except KeyboardInterrupt:
-        logger.info("Consumer stopped by user")
+        logger.warning("Consumer stopped by user")
         channel.stop_consuming()
