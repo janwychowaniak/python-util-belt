@@ -202,38 +202,40 @@ echo $?
 
 ---
 
-## Testing Lazy Initialization (Import Safety)
+## Testing Immediate Handler Registration (Import Behavior)
 
-**Purpose:** Verify no signal handlers are registered at import time.
+**Purpose:** Verify that signal handlers are registered immediately at import time.
 
 **Test Script:**
 ```python
-# test_lazy_init.py
+# test_import_registration.py
 import sys
 import signal
 
 print("1. Before import - default SIGINT handler:")
-print("  ", signal.signal(signal.SIGINT, signal.SIG_DFL))
+default_handler = signal.signal(signal.SIGINT, signal.SIG_DFL)
+signal.signal(signal.SIGINT, default_handler)  # Restore
+print("   ", default_handler)
 
 import catch_signals
 
-print("2. After import - SIGINT handler (should be default):")
-print("  ", signal.signal(signal.SIGINT, signal.SIG_DFL))
+print("2. After import - SIGINT handler (should be custom):")
+current_handler = signal.getsignal(signal.SIGINT)
+print("   ", current_handler)
+print("   Is custom handler?", current_handler != signal.default_int_handler)
 
-print("3. Restoring and using assist_signals...")
-signal.signal(signal.SIGINT, signal.default_int_handler)
+print("3. Testing protected block...")
 with catch_signals.assist_signals():
-    print("4. Inside protected block - handlers now registered")
-    print("   Press Ctrl+C to test")
+    print("   Inside protected block - press Ctrl+C")
     from time import sleep
     sleep(5)
 ```
 
 **Expected Behavior:**
-- ✓ Before first use: default signal handler in place
-- ✓ After import: handlers NOT registered yet
-- ✓ After first `assist_signals()`: handlers registered
-- ✓ No side effects from simple `import catch_signals`
+- ✓ Before import: default signal handler in place
+- ✓ After import: custom handlers ARE registered immediately
+- ✓ Protected blocks work without requiring initialization
+- ✓ Import has side effect of registering signal handlers
 
 ---
 
@@ -263,11 +265,12 @@ Standard Unix convention: `exit_code = 128 + signal_number`
 - Allows calling code to identify which signal caused exit
 - Different from simple `sys.exit(0)` or `sys.exit(1)`
 
-### Why Lazy Initialization?
-- Avoids import-time side effects (Pythonic)
-- Safe for modules that import but don't use
-- Clean testing (can import without affecting signal handlers)
-- Follows best practices from PEP 8 and Python stdlib
+### Why Immediate Initialization?
+- Handlers ready immediately at application startup
+- Predictable behavior - signal handling active as soon as module is imported
+- Simpler implementation - no lazy initialization logic needed
+- Better for applications that want signal protection from the start
+- Trade-off: import has side effect of registering handlers (acceptable for this use case)
 
 ### Thread Safety Note
 Signal handlers are process-wide in Python. This module uses a simple module-level state appropriate for single-threaded or main-thread signal handling. **Not designed for complex multi-threaded scenarios where different threads need independent signal protection.**

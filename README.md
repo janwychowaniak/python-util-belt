@@ -94,7 +94,7 @@ Defer signal termination (SIGINT/SIGTERM) for critical code sections.
 - Support for SIGINT (Ctrl+C) and SIGTERM signals
 - Proper exit codes (130 for SIGINT, 143 for SIGTERM)
 - Configurable logging (stdlib, loguru, or custom)
-- Lazy initialization (no import-time side effects)
+- Immediate handler registration at import time
 - Zero external dependencies
 
 **Usage:**

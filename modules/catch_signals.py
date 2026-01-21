@@ -11,7 +11,7 @@ Key Features:
     - Support for SIGINT (Ctrl+C) and SIGTERM signals
     - Proper exit codes (130 for SIGINT, 143 for SIGTERM)
     - Configurable logging (stdlib, loguru, or custom)
-    - Lazy initialization (no import-time side effects)
+    - Immediate handler registration at import time
     - Zero external dependencies
 
 Basic Usage:
@@ -56,24 +56,24 @@ from typing import Optional, Any
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Private module-level state (lazy initialization)
-
-_signal_state: Optional['_SignalState'] = None
-
+# Private module-level state (initialized at import time)
 
 class _SignalState:
-    """Encapsulates signal handling state (initialized lazily on first use)."""
+    """Encapsulates signal handling state."""
 
     def __init__(self):
         self.received_signal: Optional[int] = None  # Signal number (2 for SIGINT, 15 for SIGTERM)
         self.in_protected_block: bool = False
-        self.handlers_registered: bool = False
+        self.logger: Any = logging.getLogger(__name__)  # Default logger, can be updated
+
+
+_signal_state = _SignalState()
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Private helper functions
 
-def _signal_handler(sig: int, frame, logger: Any) -> None:
+def _signal_handler(sig: int, frame) -> None:
     """
     Internal signal handler called when SIGINT or SIGTERM received.
 
@@ -83,9 +83,9 @@ def _signal_handler(sig: int, frame, logger: Any) -> None:
     Args:
         sig: Signal number (signal.SIGINT=2 or signal.SIGTERM=15)
         frame: Stack frame (unused, required by signal handler signature)
-        logger: Logger instance for output
     """
     global _signal_state
+    logger = _signal_state.logger
 
     signal_name = 'SIGINT' if sig == signal.SIGINT else 'SIGTERM'
     logger.warning(f"Signal received: {signal_name} (signal {sig}), will exit")
@@ -100,37 +100,9 @@ def _signal_handler(sig: int, frame, logger: Any) -> None:
         sys.exit(exit_code)
 
 
-def _ensure_handlers_registered(logger: Any) -> _SignalState:
-    """
-    Ensure signal handlers are registered (lazy initialization).
-
-    On first call, creates the global state object and registers signal handlers
-    for SIGINT and SIGTERM. Subsequent calls return the existing state without
-    re-registering handlers.
-
-    Args:
-        logger: Logger instance to pass to signal handlers
-
-    Returns:
-        The global signal state object
-
-    Note:
-        This function enables lazy initialization - signal handlers are only
-        registered when assist_signals() is first used, not at module import time.
-    """
-    global _signal_state
-
-    if _signal_state is None:
-        _signal_state = _SignalState()
-
-    if not _signal_state.handlers_registered:
-        # Register handlers for SIGINT (Ctrl+C) and SIGTERM
-        signal.signal(signal.SIGINT, lambda sig, frame: _signal_handler(sig, frame, logger))
-        signal.signal(signal.SIGTERM, lambda sig, frame: _signal_handler(sig, frame, logger))
-        _signal_state.handlers_registered = True
-        logger.debug("Signal handlers registered for SIGINT and SIGTERM")
-
-    return _signal_state
+# Register signal handlers at module import time
+signal.signal(signal.SIGINT, _signal_handler)
+signal.signal(signal.SIGTERM, _signal_handler)
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -176,7 +148,7 @@ def assist_signals(logger: Optional[Any] = None):
         ...     os.rename('data.txt', 'data.final')
 
     Notes:
-        - Signal handlers registered on first use (lazy initialization)
+        - Signal handlers registered at module import time
         - Exit codes follow Unix convention: 128 + signal_number
           * SIGINT (signal 2) → exit code 130
           * SIGTERM (signal 15) → exit code 143
@@ -184,25 +156,24 @@ def assist_signals(logger: Optional[Any] = None):
         - Thread safety: Signals are process-wide, state is module-level
         - Not designed for complex multi-threaded signal handling scenarios
     """
-    # Fallback to stdlib logging if no logger provided
-    if logger is None:
-        logger = logging.getLogger(__name__)
+    global _signal_state
 
-    # Ensure handlers registered (lazy init on first call)
-    state = _ensure_handlers_registered(logger)
+    # Update logger if provided
+    if logger is not None:
+        _signal_state.logger = logger
 
     # Mark as in protected block
-    state.in_protected_block = True
+    _signal_state.in_protected_block = True
 
     try:
         yield
     finally:
         # Unmark protected block
-        state.in_protected_block = False
+        _signal_state.in_protected_block = False
 
         # If signal was received during protected block, exit now with proper code
-        if state.received_signal is not None:
-            exit_code = 128 + state.received_signal
-            signal_name = 'SIGINT' if state.received_signal == signal.SIGINT else 'SIGTERM'
-            logger.info(f"Protected block completed, exiting with code {exit_code} ({signal_name})")
+        if _signal_state.received_signal is not None:
+            exit_code = 128 + _signal_state.received_signal
+            signal_name = 'SIGINT' if _signal_state.received_signal == signal.SIGINT else 'SIGTERM'
+            _signal_state.logger.info(f"Protected block completed, exiting with code {exit_code} ({signal_name})")
             sys.exit(exit_code)

@@ -177,14 +177,14 @@ Signal handler protection - Defer signal termination for critical code sections
 - Support for SIGINT (Ctrl+C) and SIGTERM signals
 - Proper exit codes (130 for SIGINT, 143 for SIGTERM)
 - Configurable logging (stdlib, loguru, or custom)
-- Lazy initialization (no import-time side effects)
+- Immediate handler registration at import time
 - Zero external dependencies
 
 **Functions:**
 - `assist_signals(logger=None) -> ContextManager`
 
 **Key Implementation Details:**
-- Uses lazy initialization to avoid import-time side effects
+- Signal handlers registered immediately at module import time
 - Encapsulated state in private `_SignalState` class
 - Follows Unix exit code convention: 128 + signal_number
 - Simple boolean flag for nesting (not depth-counted)
@@ -324,8 +324,9 @@ A: Modules are cross-platform (Python stdlib). Scripts work on WSL/Git Bash. Use
 3. **Simplification** - Eliminated overengineering, kept minimal viable structure
 4. **First module** - `ncvz.py` network connectivity checker
 5. **Documentation** - This CLAUDE.md and comprehensive README.md
-6. **Second module** - `catch_signals.py` signal handler protection with lazy initialization and proper exit codes
+6. **Second module** - `catch_signals.py` signal handler protection with proper exit codes
 7. **Third module** - `rmq.py` RabbitMQ JSON messaging - first module with external dependency (pika)
+8. **Architecture refinement** - Changed `catch_signals.py` from lazy to immediate handler registration for predictable startup behavior
 
 ## External Dependencies
 
