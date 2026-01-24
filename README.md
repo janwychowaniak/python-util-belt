@@ -54,10 +54,11 @@ if ncvz('google.com', 80):
 
 ### `ncvz` - Network Connectivity Checker
 
-Python equivalent of `nc -vz HOST PORT` with corporate proxy support.
+Python equivalent of `nc -vz HOST PORT` with corporate proxy support and URL parsing.
 
 **Features:**
 - Direct TCP connectivity checks
+- Full URL support (extracts host/port automatically)
 - Corporate proxy support via HTTP CONNECT
 - Configurable logging (stdlib, loguru, or custom)
 - Environment-based proxy auto-detection
@@ -73,14 +74,20 @@ ncvz('google.com', 80)  # True/False
 # With timeout
 ncvz('internal.service', 5432, timeout=2.0)
 
+# Full URL support (port extracted from URL)
+ncvz('http://127.0.0.1:19000')  # Port 19000 from URL
+ncvz('https://api.service.com')  # Port 443 inferred from https scheme
+ncvz('http://example.com:8080', timeout=1.0)
+
 # Via corporate proxy
 ncvz('external-api.com', 443, proxy='http://proxy.company.com:8080')
 
 # Auto-detect proxy from environment (HTTP_PROXY, HTTPS_PROXY)
 ncvz_auto('api.service.com', 443)
+ncvz_auto('http://internal.service:5000')  # Also supports URLs
 ```
 
-**Version:** 1.0
+**Version:** 1.1
 **Author:** Mila 🪄
 
 ---

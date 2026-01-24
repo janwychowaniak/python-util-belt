@@ -150,22 +150,28 @@ def function(...):
 
 ## Current Modules
 
-### ncvz.py (v1.0)
+### ncvz.py (v1.1)
 Network connectivity checker - Python equivalent of `nc -vz HOST PORT`
 
 **Location:** `modules/ncvz.py`
 **Dev Notes:** `dev-notes/ncvz.md`
 **Features:**
 - Direct TCP connectivity checks
+- Full URL support (extracts host/port automatically from URLs)
 - Corporate proxy support via HTTP CONNECT
 - Configurable logging (stdlib, loguru, or custom)
 - Environment-based proxy auto-detection
 - Zero external dependencies
 
 **Functions:**
-- `ncvz(host, port, timeout=3.0, proxy=None, logger=None) -> bool`
-- `ncvz_auto(host, port, timeout=3.0, logger=None) -> bool`
-- `ncvz_external(host, port, timeout=3.0, logger=None) -> bool`
+- `ncvz(host, port=None, timeout=3.0, proxy=None, logger=None) -> bool` - Accepts host+port or full URL
+- `ncvz_auto(host, port=None, timeout=3.0, logger=None) -> bool` - Accepts host+port or full URL
+- `ncvz_external(host, port=None, timeout=3.0, logger=None) -> bool` - Accepts host+port or full URL
+
+**URL Parsing:**
+- Supports http://, https://, ws://, wss:// schemes
+- Extracts port from URL or infers from scheme (http/ws: 80, https/wss: 443)
+- Maintains backward compatibility with traditional host+port arguments
 
 ### catch_signals.py (v1.0)
 Signal handler protection - Defer signal termination for critical code sections

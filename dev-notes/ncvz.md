@@ -16,6 +16,15 @@ DEST_LOCALH = "127.0.0.1"
 # Port numbers for tests
 PORT_OK = 443  # HTTPS, most typically safe
 PORT_BAD = 0   # Something invalid surely
+
+# URL test cases (for URL parsing functionality)
+URL_HTTP = "http://127.0.0.1:19000"        # HTTP with explicit port
+URL_HTTPS = "https://stat.ripe.net"        # HTTPS with inferred port 443
+URL_HTTP_PORT = "http://example.com:8080"  # HTTP with custom port
+URL_WS = "ws://127.0.0.1:9000"             # WebSocket with explicit port
+URL_WSS = "wss://ws.example.com"           # WebSocket Secure with inferred port 443
+URL_BAD = "ftp://example.com"              # Unsupported scheme (no default port)
+URL_NOSCHEME = "example.com:8080"          # Not a URL (missing scheme)
 ```
 
 ```py
@@ -136,4 +145,38 @@ ncvz(DEST_BADDNS, PORT_OK, logger=logger)   # ✘ (DNS resolution failed)
 ncvz(DEST_BADDNS, PORT_BAD, logger=logger)  # ✘ (DNS resolution failed)
 
 ncvz(DEST_LOCALH, PORT_BAD, logger=logger)  # ✘ (Connection refused)
+
+# URL Parsing Tests ---------------------------------------------------------
+
+## Check: URL parsing (various schemes and port handling)
+
+ncvz(URL_HTTP)                    # ✔/✘ (extracts 127.0.0.1:19000)
+ncvz(URL_HTTPS)                   # ✔/✘ (extracts api.example.com:443)
+ncvz(URL_HTTP_PORT)               # ✔/✘ (extracts example.com:8080)
+ncvz(URL_WS)                      # ✔/✘ (extracts 127.0.0.1:9000)
+ncvz(URL_WSS)                     # ✔/✘ (extracts ws.example.com:443)
+ncvz(URL_BAD)                     # ✘ (Cannot determine port for scheme 'ftp')
+ncvz(URL_NOSCHEME)                # ✘ (Port required when providing hostname without URL scheme)
+
+## Check: URL with timeout
+
+ncvz(URL_HTTP, timeout=1.0)       # ✔/✘ (extracts host:port, uses 1s timeout)
+
+## Check: URL with proxy
+
+ncvz(URL_HTTPS, proxy=PROXY_OK)   # ✔/✘ (URL parsed, routed via proxy)
+
+## Check: URL with ncvz_auto
+
+ncvz_auto(URL_HTTP)               # ✔/✘ (URL parsed, auto-detect proxy from env)
+ncvz_auto(URL_HTTPS)              # ✔/✘ (extracts api.example.com:443)
+
+## Check: URL with ncvz_external
+
+ncvz_external(URL_HTTPS)          # ✔/✘ (URL parsed, uses env proxy)
+
+## Check: Mixed usage (backward compatibility with host+port)
+
+ncvz('example.com', 443)          # ✔/✘ (traditional host+port still works)
+ncvz('127.0.0.1', 8080)           # ✔/✘ (traditional IP+port still works)
 ```
